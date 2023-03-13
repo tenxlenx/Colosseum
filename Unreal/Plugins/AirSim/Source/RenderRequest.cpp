@@ -3,6 +3,7 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Async/TaskGraphInterfaces.h"
 #include "ImageUtils.h"
+#include "CubemapUnwrapUtils.h"
 
 #include "AirBlueprintLib.h"
 #include "Async/Async.h"
@@ -87,7 +88,18 @@ void RenderRequest::getScreenshot(std::shared_ptr<RenderParams> params[], std::v
 
             // while we're still on GameThread, enqueue request for capture the scene!
             for (unsigned int i = 0; i < req_size_; ++i) {
-                params_[i]->render_component->CaptureSceneDeferred();
+                auto& temp_param = params_[i];
+                if (!temp_param->is_cube) {
+                    temp_param->render_component->CaptureSceneDeferred();
+                }
+                else {
+                    // Cube. If render_component only calls the overrided methods,
+                    // we can use polymorphism with virtual function calls.
+                    temp_param->render_component_cube->CaptureSceneDeferred();
+
+                    // Get the raw 8bit data.
+                    unWarpTextureRenderTargetCube(temp_param->render_target_cube, results_[i]->cube_raw);
+                }
             }
         });
 
@@ -101,26 +113,57 @@ void RenderRequest::getScreenshot(std::shared_ptr<RenderParams> params[], std::v
     }
 
     for (unsigned int i = 0; i < req_size; ++i) {
-        if (!params[i]->pixels_as_float) {
-            if (results[i]->width != 0 && results[i]->height != 0) {
-                results[i]->image_data_uint8.SetNumUninitialized(results[i]->width * results[i]->height * 3, false);
-                if (params[i]->compress)
-                    UAirBlueprintLib::CompressImageArray(results[i]->width, results[i]->height, results[i]->bmp, results[i]->image_data_uint8);
-                else {
-                    uint8* ptr = results[i]->image_data_uint8.GetData();
-                    for (const auto& item : results[i]->bmp) {
-                        *ptr++ = item.B;
-                        *ptr++ = item.G;
-                        *ptr++ = item.R;
+        if (!params[i]->is_cube) {
+            if (!params[i]->pixels_as_float) {
+                if (results[i]->width != 0 && results[i]->height != 0) {
+                    results[i]->image_data_uint8.SetNumUninitialized(results[i]->width * results[i]->height * 3, false);
+                    if (params[i]->compress)
+                        UAirBlueprintLib::CompressImageArray(results[i]->width, results[i]->height, results[i]->bmp, results[i]->image_data_uint8);
+                    else {
+                        uint8* ptr = results[i]->image_data_uint8.GetData();
+                        for (const auto& item : results[i]->bmp) {
+                            *ptr++ = item.B;
+                            *ptr++ = item.G;
+                            *ptr++ = item.R;
+                        }
                     }
+                }
+            }
+            else {
+                results[i]->image_data_float.SetNumUninitialized(results[i]->width * results[i]->height);
+                float* ptr = results[i]->image_data_float.GetData();
+                for (const auto& item : results[i]->bmp_float) {
+                    *ptr++ = item.R.GetFloat();
                 }
             }
         }
         else {
-            results[i]->image_data_float.SetNumUninitialized(results[i]->width * results[i]->height);
-            float* ptr = results[i]->image_data_float.GetData();
-            for (const auto& item : results[i]->bmp_float) {
-                *ptr++ = item.R.GetFloat();
+            if (!params[i]->pixels_as_float) {
+                // RRG 8bit.
+                if (params[i]->compress) {
+                    // Compress.
+                    compressTArrayAsPng32bit(results[i]->cube_raw, results[i]->cube_image_data, results[i]->width, results[i]->height, 100);
+                    // UAirBlueprintLib::CompressImageArray(results[i]->width, results[i]->height, results[i]->bmp, results[i]->image_data_uint8);
+                    // Copy the data from TArray64 to TArray.
+                    copyFromTArray2TArray(results[i]->cube_image_data, results[i]->image_data_uint8);
+                }
+                else {
+                    copyFromTArray2TArray(results[i]->cube_raw, results[i]->image_data_uint8);
+                }
+            }
+            else {
+                // FFloat16Color.
+                auto tempF16 = reinterpret_cast<FFloat16*>(results[i]->cube_raw.GetData());
+
+                // Initialize the memory.
+                results[i]->image_data_float.SetNumUninitialized(results[i]->width * results[i]->height);
+
+                // Loop and copy.
+                float* ptr = results[i]->image_data_float.GetData();
+                const int N = results[i]->cube_raw.Num() / 2; // Every FFloat16 contains 2 uint8.
+                for (int f16 = 0; f16 < N; f16 += 4) {
+                    *ptr++ = (tempF16 + f16)->GetFloat() * 0.01f; // Convert from centimeter to meter.
+                }
             }
         }
     }
@@ -141,6 +184,14 @@ void RenderRequest::ExecuteTask()
 {
     if (params_ != nullptr && req_size_ > 0) {
         for (unsigned int i = 0; i < req_size_; ++i) {
+            // Cube.
+            if (params_[i]->is_cube) {
+                results_[i]->width = params_[i]->render_target_cube->SizeX * 2;
+                results_[i]->height = params_[i]->render_target_cube->SizeX;
+                results_[i]->time_stamp = msr::airlib::ClockFactory::get()->nowNanos();
+                continue;
+            }
+
             FRHICommandListImmediate& RHICmdList = GetImmediateCommandList_ForRenderCommand();
             auto rt_resource = params_[i]->render_target->GetRenderTargetResource();
             if (rt_resource != nullptr) {
@@ -178,4 +229,25 @@ void RenderRequest::ExecuteTask()
 
         wait_signal_->signal();
     }
+}
+
+
+bool RenderRequest::unWarpTextureRenderTargetCube(const UTextureRenderTargetCube* TRTCube, TArray64<uint8>& OutData)
+{
+    FIntPoint Size;
+    EPixelFormat PixelFormat;
+
+    if (!CubemapHelpers::GenerateLongLatUnwrap(TRTCube, OutData, Size, PixelFormat)) {
+        UE_LOG(LogTemp, Warning, TEXT("CubemapHelpers::GenerateLogLatUnwrap() failed. "));
+        return false;
+    }
+
+    verifyf(TRTCube->SizeX == Size.Y, TEXT("TRTCube.SizeX = %d, Size.Y = %d"), TRTCube->SizeX, Size.Y);
+    verifyf(TRTCube->SizeX == Size.X / 2, TEXT("TRTCube.SizeX = %d, Size.X = %d"), TRTCube->SizeX, Size.X);
+    verifyf(TRTCube->GetFormat() == PixelFormat,
+            TEXT("TRTCube->GetFormat() = %d, PixelFormat = %d. "),
+            TRTCube->GetFormat(),
+            PixelFormat);
+
+    return true;
 }

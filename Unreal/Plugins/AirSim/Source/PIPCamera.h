@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Components/SceneCaptureComponentCube.h"
 #include "Camera/CameraActor.h"
 #include "Materials/Material.h"
 #include "Runtime/Core/Public/PixelFormat.h"
@@ -10,6 +11,7 @@
 #include "common/AirSimSettings.hpp"
 #include "NedTransform.h"
 #include "DetectionComponent.h"
+#include "DetectionComponentCube.h"
 
 //CinemAirSim
 #include <CineCameraActor.h>
@@ -23,13 +25,17 @@
 UCLASS()
 class AIRSIM_API APIPCamera : public ACineCameraActor //CinemAirSim
 {
+
     GENERATED_BODY()
+
 
 public:
     typedef msr::airlib::ImageCaptureBase::ImageType ImageType;
     typedef msr::airlib::AirSimSettings AirSimSettings;
     typedef AirSimSettings::CameraSetting CameraSetting;
 
+        // cube.
+    typedef msr::airlib::ImageCaptureBase ImageCaptureBase;
     APIPCamera(const FObjectInitializer& ObjectInitializer); //CinemAirSim
 
     virtual void PostInitializeComponents() override;
@@ -79,7 +85,12 @@ public:
     USceneCaptureComponent2D* getCaptureComponent(const ImageType type, bool if_active);
     UTextureRenderTarget2D* getRenderTarget(const ImageType type, bool if_active);
     UDetectionComponent* getDetectionComponent(const ImageType type, bool if_active) const;
+    UDetectionComponentCube* getDetectionComponentCube(const ImageType type, bool if_active) const;
 
+     // Cube.
+    USceneCaptureComponentCube* getCaptureComponentCube(const ImageType type, bool if_active);
+    UTextureRenderTargetCube* getRenderTargetCube(const ImageType type, bool if_active);
+    USceneCaptureComponent* getCaptureComponentGeneral(const ImageType type, bool if_active);
     msr::airlib::Pose getPose() const;
 
 private: //members
@@ -88,12 +99,19 @@ private: //members
     UPROPERTY()
     UMaterialParameterCollectionInstance* distortion_param_instance_;
 
+    // Cube.
+    UPROPERTY()
+    TArray<USceneCaptureComponentCube*> captures_cube_;
+    UPROPERTY()
+    TArray<UTextureRenderTargetCube*> render_targets_cube_;
+
     UPROPERTY()
     TArray<USceneCaptureComponent2D*> captures_;
     UPROPERTY()
     TArray<UTextureRenderTarget2D*> render_targets_;
     UPROPERTY()
     TArray<UDetectionComponent*> detections_;
+    TArray<UDetectionComponentCube*> detections_cube_;
 
     //CinemAirSim
     UPROPERTY()
@@ -123,10 +141,17 @@ private: //methods
     typedef AirSimSettings::NoiseSetting NoiseSetting;
 
     static unsigned int imageTypeCount();
+    //Cube.
+    static unsigned int imageTypeCount2D();
+    static unsigned int cubeTypeCount();
     void enableCaptureComponent(const ImageType type, bool is_enabled);
     static void updateCaptureComponentSetting(USceneCaptureComponent2D* capture, UTextureRenderTarget2D* render_target,
                                               bool auto_format, const EPixelFormat& pixel_format, const CaptureSetting& setting, const NedTransform& ned_transform,
                                               bool force_linear_gamma);
+    // Cube.
+    static void updateCaptureComponentSettingCube(USceneCaptureComponentCube* capture, UTextureRenderTargetCube* render_target,
+                                                  bool auto_format, const EPixelFormat& pixel_format, const CaptureSetting& setting,
+                                                  bool force_linear_gamma);
     void setNoiseMaterial(int image_type, UObject* outer, FPostProcessSettings& obj, const NoiseSetting& settings);
     void setDistortionMaterial(int image_type, UObject* outer, FPostProcessSettings& obj);
     static void updateCameraPostProcessingSetting(FPostProcessSettings& obj, const CaptureSetting& setting);
@@ -134,5 +159,6 @@ private: //methods
     static void updateCameraSetting(UCineCameraComponent* camera, const CaptureSetting& setting, const NedTransform& ned_transform);
     void copyCameraSettingsToAllSceneCapture(UCameraComponent* camera);
     void copyCameraSettingsToSceneCapture(UCameraComponent* src, USceneCaptureComponent2D* dst);
+    void copyCameraSettingsToSceneCaptureCube(UCameraComponent* src, USceneCaptureComponentCube* dst);
     //end CinemAirSim
 };
