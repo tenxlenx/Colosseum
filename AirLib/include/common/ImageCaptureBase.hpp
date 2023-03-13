@@ -7,6 +7,9 @@
 #include "common/Common.hpp"
 #include "common/common_utils/EnumFlags.hpp"
 
+// Cube.
+#include "common/common_utils/Utils.hpp"
+
 namespace msr
 {
 namespace airlib
@@ -28,8 +31,32 @@ namespace airlib
             Infrared,
             OpticalFlow,
             OpticalFlowVis,
+            CubeScene,
+            CubeDepth,
             Count //must be last
         };
+
+        static bool isCubeType(const ImageType& type)
+        {
+            return type >= ImageType::CubeScene;
+        }
+
+        static bool isCubeType(int type)
+        {
+            return isCubeType(common_utils::Utils::toEnum<ImageType>(type));
+        }
+
+        static int getCubeTypeIndex(const ImageType& type)
+        {
+            assert(isCubeType(type));
+            return common_utils::Utils::toNumeric(type) -
+                   common_utils::Utils::toNumeric(ImageType::CubeScene);
+        }
+
+        static int getCubeTypeIndex(int type)
+        {
+            return getCubeTypeIndex(common_utils::Utils::toEnum<ImageType>(type));
+        }
 
         struct ImageRequest
         {
