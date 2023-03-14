@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.25.0)
 project(HelloCar)
 
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../cmake-modules") 
@@ -8,6 +8,8 @@ CommonSetup()
 IncludeEigen()
 
 SetupConsoleBuild()
+find_package(protobuf CONFIG REQUIRED)
+find_package(OpenCV CONFIG REQUIRED)
 
 ## Specify additional locations of header files
 include_directories(
@@ -16,6 +18,7 @@ include_directories(
   ${RPC_LIB_INCLUDES}
   ${AIRSIM_ROOT}/MavLinkCom/include
   ${AIRSIM_ROOT}/MavLinkCom/common_utils
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 AddExecutableSource()
@@ -23,3 +26,4 @@ AddExecutableSource()
 CommonTargetLink()
 target_link_libraries(${PROJECT_NAME} AirLib)
 target_link_libraries(${PROJECT_NAME} ${RPC_LIB})
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
