@@ -12,6 +12,11 @@ STRICT_MODE_ON
 #include "vehicles/car/api/CarRpcLibClient.hpp"
 #include "common/common_utils/FileSystem.hpp"
 #include <iostream>
+#include <chrono>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/opencv.hpp>
 
 int main()
 {
@@ -22,7 +27,8 @@ int main()
 
     // This assumes you are running DroneServer already on the same machine.
     // DroneServer must be running first.
-    msr::airlib::CarRpcLibClient client;
+    msr::airlib::CarRpcLibClient client("100.93.151.43");
+    //msr::airlib::CarRpcLibClient client;
     typedef ImageCaptureBase::ImageRequest ImageRequest;
     typedef ImageCaptureBase::ImageResponse ImageResponse;
     typedef ImageCaptureBase::ImageType ImageType;
@@ -31,65 +37,17 @@ int main()
     try {
         client.confirmConnection();
 
-        std::cout << "Press Enter to get FPV image" << std::endl;
-        std::cin.get();
-        const std::vector<ImageRequest> request{ ImageRequest("0", ImageType::Scene), ImageRequest("1", ImageType::DepthPlanar, true) };
-        const std::vector<ImageResponse>& response = client.simGetImages(request);
-        std::cout << "# of images received: " << response.size() << std::endl;
+        while (1) {
+            vector<ImageRequest> request = { ImageRequest("panorama", ImageType::CubeScene, false, true) };
+            const vector<ImageResponse>& response = client.simGetImages(request);
+            cv::Mat h_result = cv::imdecode(response[0].image_data_uint8, -1);
 
-        if (!response.size()) {
-            std::cout << "Enter path with ending separator to save images (leave empty for no save)" << std::endl;
-            std::string path;
-            std::getline(std::cin, path);
-
-            for (const ImageResponse& image_info : response) {
-                std::cout << "Image uint8 size: " << image_info.image_data_uint8.size() << std::endl;
-                std::cout << "Image float size: " << image_info.image_data_float.size() << std::endl;
-
-                if (path != "") {
-                    std::string file_path = FileSystem::combine(path, std::to_string(image_info.time_stamp));
-                    if (image_info.pixels_as_float) {
-                        Utils::writePFMfile(image_info.image_data_float.data(), image_info.width, image_info.height, file_path + ".pfm");
-                    }
-                    else {
-                        std::ofstream file(file_path + ".png", std::ios::binary);
-                        file.write(reinterpret_cast<const char*>(image_info.image_data_uint8.data()), image_info.image_data_uint8.size());
-                        file.close();
-                    }
-                }
-            }
+            cv::imshow("pano", h_result);
+            cv::waitKey(1);
         }
-
-        //enable API control
-        client.enableApiControl(true);
-        CarApiBase::CarControls controls;
-
-        std::cout << "Press enter to drive forward" << std::endl;
-        std::cin.get();
-        controls.throttle = 0.5f;
-        controls.steering = 0.0f;
-        client.setCarControls(controls);
-
-        std::cout << "Press Enter to activate handbrake" << std::endl;
-        std::cin.get();
-        controls.handbrake = true;
-        client.setCarControls(controls);
-
-        std::cout << "Press Enter to take turn and drive backward" << std::endl;
-        std::cin.get();
-        controls.handbrake = false;
-        controls.throttle = -0.5;
-        controls.steering = 1;
-        controls.is_manual_gear = true;
-        controls.manual_gear = -1;
-        client.setCarControls(controls);
-
-        std::cout << "Press Enter to stop" << std::endl;
-        std::cin.get();
-        client.setCarControls(CarApiBase::CarControls());
     }
     catch (rpc::rpc_error& e) {
-        const auto msg = e.get_error().as<std::string>();
+        std::string msg = e.get_error().as<std::string>();
         std::cout << "Exception raised by the API, something went wrong." << std::endl
                   << msg << std::endl;
         std::cin.get();
