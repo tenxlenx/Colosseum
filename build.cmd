@@ -125,6 +125,61 @@ robocopy /MIR external\rpclib\%RPC_VERSION_FOLDER%\build\Release %RPCLIB_TARGET_
 robocopy /MIR external\rpclib\%RPC_VERSION_FOLDER%\build\%buildMode% %RPCLIB_TARGET_LIB%\%buildMode%
 )
 
+REM //---------- Get ZeroMQ ----------
+SET PLATFORM=x64
+IF NOT EXIST external\zeromq mkdir external\zeromq
+IF NOT EXIST external\zeromq\libzmq (
+    ECHO(
+    ECHO *****************************************************************************************
+    ECHO Downloading ZeroMQ
+    ECHO *****************************************************************************************
+    @echo on
+    if "%PWSHV7%" == "" (
+        %powershell% -command "& { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr https://github.com/zeromq/libzmq/archive/refs/tags/v4.3.4.zip -OutFile external\zeromq.zip }"
+    ) else (
+        %powershell% -command "iwr https://github.com/zeromq/libzmq/archive/refs/tags/v4.3.4.zip -OutFile external\zeromq.zip"
+    )
+    @echo off
+
+    %powershell% -command "Expand-Archive -Path external\zeromq.zip -DestinationPath external\zeromq"
+
+    del external\zeromq.zip /q
+    move external\zeromq\libzmq-4.3.4\* external\zeromq
+
+    rd /s /q external\zeromq\libzmq-4.3.4
+    mkdir "external\zeromq\builds\msvc"
+    cd "external\zeromq\libzmq-4.3.4\builds\msvc"
+
+
+)
+
+REM //---------- Build ZeroMQ ------------
+ECHO Starting build for ZeroMQ...
+cd external\zeromq\builds\msvc
+call "$(VSINSTALLDIR)\Common7\Tools\VsDevCmd.bat" -arch=%PLATFORM% -host_arch=%PLATFORM%
+cd "C:/Users/tenxlenx/Colosseum/external/zeromq/zeromq-4.3.4"
+mkdir cmake_build 
+mkdir cmake_installed
+cd cmake_build 
+cmake -DCMAKE_INSTALL_PREFIX="%ROOT_DIR%\external\zeromq\cmake_installed" ..
+
+
+
+if ERRORLEVEL 1 goto :buildfailed
+cmake --build . --config Debug --target install
+if ERRORLEVEL 1 goto :buildfailed
+chdir /d %ROOT_DIR%
+
+if NOT exist cmake\build mkdir cmake\build
+cd cmake 
+set CMAKE_PREFIX_PATH=%ROOT_DIR%\external\zeromq;%CMAKE_PREFIX_PATH%
+cmake -DCMAKE_BUILD_TYPE=Debug .
+cmake --build .
+cd ../
+
+
+
+
 REM //---------- get High PolyCount SUV Car Model ------------
 IF NOT EXIST Unreal\Plugins\AirSim\Content\VehicleAdv mkdir Unreal\Plugins\AirSim\Content\VehicleAdv
 IF NOT EXIST Unreal\Plugins\AirSim\Content\VehicleAdv\SUV\v1.2.0 (
