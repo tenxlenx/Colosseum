@@ -99,7 +99,7 @@ REM //---------- Build rpclib ------------
 ECHO Starting cmake to build rpclib...
 IF NOT EXIST external\rpclib\%RPC_VERSION_FOLDER%\build mkdir external\rpclib\%RPC_VERSION_FOLDER%\build
 cd external\rpclib\%RPC_VERSION_FOLDER%\build
- cmake -G"Visual Studio 17 2022" -D CMAKE_BUILD_TYPE=Debug ..
+ cmake -G"Visual Studio 17 2022" -D CMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=C:/Users/tenxlenx/vcpkg/scripts/buildsystems/vcpkg.cmake ..
 
  if "%buildMode%" == "" (
  cmake --build . 
@@ -111,10 +111,6 @@ cd external\rpclib\%RPC_VERSION_FOLDER%\build
 
 if ERRORLEVEL 1 goto :buildfailed
 chdir /d %ROOT_DIR% 
-
-cd cmake 
-cmake -D CMAKE_BUILD_TYPE=Debug -G "Visual Studio 17 2022" -DCMAKE_TOOLCHAIN_FILE=C:/Users/tenxlenx/vcpkg/scripts/buildsystems/vcpkg.cmake .
-cmake --build .
 
 
 REM //---------- copy rpclib binaries and include folder inside AirLib folder ----------
@@ -186,16 +182,30 @@ IF NOT EXIST AirLib\deps\eigen3 (
 IF NOT EXIST AirLib\deps\eigen3 goto :buildfailed
 
 
+ 
+ 
+ 
+ 
+
+
+
+
 REM //---------- now we have all dependencies to compile AirSim.sln which will also compile MavLinkCom ----------
-if "%buildMode%" == "" (
-msbuild -maxcpucount:12 /p:Platform=x64 /p:Configuration=Debug AirSim.sln
+ if "%buildMode%" == "" (
+    msbuild -maxcpucount:12 /p:Platform=x64 /p:Configuration=Debug AirSim.sln
 if ERRORLEVEL 1 goto :buildfailed
-msbuild -maxcpucount:12 /p:Platform=x64 /p:Configuration=Release AirSim.sln 
+    msbuild -maxcpucount:12 /p:Platform=x64 /p:Configuration=Release AirSim.sln 
 if ERRORLEVEL 1 goto :buildfailed
 ) else (
-msbuild -maxcpucount:12 /p:Platform=x64 /p:Configuration=%buildMode% AirSim.sln
-if ERRORLEVEL 1 goto :buildfailed
-)
+   msbuild -maxcpucount:12 /p:Platform=x64 /p:Configuration=%buildMode% AirSim.sln
+if ERRORLEVEL 1 goto :buildfailed)
+
+
+
+
+
+
+
 
 REM //---------- copy binaries and include for MavLinkCom in deps ----------
 set MAVLINK_TARGET_LIB=AirLib\deps\MavLinkCom\lib
@@ -204,6 +214,11 @@ set MAVLINK_TARGET_INCLUDE=AirLib\deps\MavLinkCom\include
 if NOT exist %MAVLINK_TARGET_INCLUDE% mkdir %MAVLINK_TARGET_INCLUDE%
 robocopy /MIR MavLinkCom\include %MAVLINK_TARGET_INCLUDE%
 robocopy /MIR MavLinkCom\lib %MAVLINK_TARGET_LIB%
+
+cd cmake 
+ cmake -D CMAKE_BUILD_TYPE=Debug -G "Visual Studio 17 2022" -DCMAKE_TOOLCHAIN_FILE=C:/Users/tenxlenx/vcpkg/scripts/buildsystems/vcpkg.cmake .
+cmake --build .
+cd ..
 
 REM //---------- all our output goes to Unreal/Plugin folder ----------
 if NOT exist Unreal\Plugins\AirSim\Source\AirLib mkdir Unreal\Plugins\AirSim\Source\AirLib
