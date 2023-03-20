@@ -8,8 +8,9 @@ CommonSetup()
 IncludeEigen()
 
 SetupConsoleBuild()
-find_package(protobuf CONFIG REQUIRED)
+find_package(protobuf REQUIRED)
 find_package(OpenCV CONFIG REQUIRED)
+find_package(CUDAToolkit REQUIRED)
 
 ## Specify additional locations of header files
 include_directories(
@@ -19,9 +20,18 @@ include_directories(
   ${AIRSIM_ROOT}/MavLinkCom/include
   ${AIRSIM_ROOT}/MavLinkCom/common_utils
   ${OpenCV_INCLUDE_DIRS}
+  ${CUDAToolkit_INCLUDE_DIRS}
 )
 
 AddExecutableSource()
+
+target_link_libraries(${PROJECT_NAME}  CUDA::cudart
+        CUDA::nvToolsExt
+        CUDA::cublas
+        CUDA::cublasLt
+        CUDA::cufft
+        CUDA::cusolver
+        CUDA::cuda_driver)
 			
 CommonTargetLink()
 target_link_libraries(${PROJECT_NAME} AirLib)
