@@ -99,17 +99,23 @@ REM //---------- Build rpclib ------------
 ECHO Starting cmake to build rpclib...
 IF NOT EXIST external\rpclib\%RPC_VERSION_FOLDER%\build mkdir external\rpclib\%RPC_VERSION_FOLDER%\build
 cd external\rpclib\%RPC_VERSION_FOLDER%\build
-cmake -G"Visual Studio 17 2022" ..
+ cmake -G"Visual Studio 17 2022" -D CMAKE_BUILD_TYPE=Debug ..
 
-if "%buildMode%" == "" (
-cmake --build . 
-cmake --build . --config Release
-) else (
-cmake --build . --config %buildMode%
-)
+ if "%buildMode%" == "" (
+ cmake --build . 
+ cmake --build . --config Release
+ ) else (
+ cmake --build . --config %buildMode%
+ )
+
 
 if ERRORLEVEL 1 goto :buildfailed
 chdir /d %ROOT_DIR% 
+
+cd cmake 
+cmake -D CMAKE_BUILD_TYPE=Debug -G "Visual Studio 17 2022" -DCMAKE_TOOLCHAIN_FILE=C:/Users/tenxlenx/vcpkg/scripts/buildsystems/vcpkg.cmake .
+cmake --build .
+
 
 REM //---------- copy rpclib binaries and include folder inside AirLib folder ----------
 set RPCLIB_TARGET_LIB=AirLib\deps\rpclib\lib\x64
