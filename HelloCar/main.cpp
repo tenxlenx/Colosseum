@@ -26,6 +26,8 @@ STRICT_MODE_ON
 #include <mutex>
 #include <queue>
 #include <condition_variable>
+#include "gpu_dct.cuh"
+#include <chrono>
 
 
 constexpr double kSemiMajorAxis = 6378137.0;
@@ -37,8 +39,6 @@ struct ImageWriteTask
     std::string file_path;
     cv::Mat image;
 };
-
-
 
 
 struct GpsCoordinate
@@ -157,6 +157,9 @@ int main()
     std::cout << "Make sure settings.json has \"SimMode\"=\"Car\" at root. Press Enter to continue." << std::endl;
     std::cin.get();
 
+    const double desired_frame_rate = 15.0; // Desired frame rate in Hz
+    const std::chrono::duration<double> frame_duration(1.0 / desired_frame_rate);
+
     msr::airlib::CarRpcLibClient client("127.0.0.1");
 
     typedef ImageCaptureBase::ImageRequest ImageRequest;
@@ -164,14 +167,9 @@ int main()
     typedef ImageCaptureBase::ImageType ImageType;
     typedef common_utils::FileSystem FileSystem;
 
-    std::string data_folder = createUniqueFolder();
-    std::ofstream data_file;
-    data_file.open(data_folder + "/sensor_data.csv");
-    data_file << "timestamp,x,y,z,heading,speed,steering,image_name" << std::endl;
-
     auto vehicles = client.listVehicles();
     for (auto v : vehicles) {
-        std::cout << "VEHICLE: " <<  v << std::endl;
+        std::cout << "VEHICLE: " << v << std::endl;
     }
 
     if (vehicles[0] == "drone_flight") {
@@ -181,51 +179,102 @@ int main()
         isCarMode = true;
     }
 
+    std::string data_folder = createUniqueFolder();
+    std::ofstream data_file;
+    data_file.open(data_folder + "/sensor_data.csv");
+    if (isCarMode) {
+        data_file << "timestamp,vehicle_type,x,y,z,yaw,pitch,roll,speed,steering,image_name" << std::endl;
+    }
+    else {
+        data_file << "timestamp,vehicle_type,x,y,z,yaw,pitch,roll,speed,steering,image_name" << std::endl;
+    }
+
     GpsCoordinate ref_gps;
     bool ref_gps_initialized = false;
 
+     // Create the image writer thread
+    std::queue<ImageWriteTask>image_write_task_queue;
+    std::mutex image_write_task_queue_mutex;
+    std::condition_variable image_write_task_queue_cv;
+    bool stop_image_writer_thread = false;
+
+    std::thread image_writer_thread(
+        image_writer_thread_func,
+        std::ref(image_write_task_queue),
+        std::ref(image_write_task_queue_mutex),
+        std::ref(image_write_task_queue_cv),
+        std::ref(stop_image_writer_thread));
+
     try {
         client.confirmConnection();
+        std::chrono::steady_clock::time_point next_frame_time = std::chrono::steady_clock::now();
 
         while (1) {
-            vector<ImageRequest> request = { ImageRequest("panorama", ImageType::CubeScene, false, true) };
-            const vector<ImageResponse>& response = client.simGetImages(request);
-            cv::Mat h_result = cv::imdecode(response[0].image_data_uint8, 1);
+            std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
 
-           
-            
-            auto gps_data = client.getGpsData();
-            auto imu_data = client.getImuData();
-            EulerAngle euler_angles = quaternionToEuler(imu_data.orientation);
-            double heading = euler_angles.yaw * 180.0 / M_PI; // Convert radians to degrees
+            if (current_time >= next_frame_time) {
+                vector<ImageRequest> request = { ImageRequest("panorama", ImageType::CubeScene, false, true) };
+                const vector<ImageResponse>& response = client.simGetImages(request);
+                cv::Mat h_result = cv::imdecode(response[0].image_data_uint8, 1);
 
-            if (!ref_gps_initialized) {
-                ref_gps = GpsCoordinate{ gps_data.gnss.geo_point.latitude, gps_data.gnss.geo_point.longitude, gps_data.gnss.geo_point.altitude };
-                ref_gps_initialized = true;
+                auto gps_data = client.getGpsData();
+                auto imu_data = client.getImuData();
+                EulerAngle euler_angles = quaternionToEuler(imu_data.orientation);
+                double heading = euler_angles.yaw * 180.0 / M_PI; // Convert radians to degrees
+                double pitch = euler_angles.pitch * 180.0 / M_PI;
+                double roll = euler_angles.pitch * 180 / M_PI;
+
+                if (!ref_gps_initialized) {
+                    ref_gps = GpsCoordinate{ gps_data.gnss.geo_point.latitude, gps_data.gnss.geo_point.longitude, gps_data.gnss.geo_point.altitude };
+                    ref_gps_initialized = true;
+                }
+
+                GpsCoordinate current_gps{ gps_data.gnss.geo_point.latitude, gps_data.gnss.geo_point.longitude, gps_data.gnss.geo_point.altitude };
+                CartesianCoordinate local_xyz = gpsToEnu(current_gps, ref_gps);
+
+                std::string image_name = data_folder + "/panorama_" + std::to_string(response[0].time_stamp) + ".jpg";
+                // Add the image write task to the queue
+                {
+                    std::lock_guard<std::mutex> lock(image_write_task_queue_mutex);
+                    image_write_task_queue.push(ImageWriteTask{ image_name, h_result });
+                }
+                image_write_task_queue_cv.notify_one();
+
+                if (isCarMode) {
+                    auto car_controls = client.getCarControls();
+                    auto car_state = client.getCarState();
+                    data_file << response[0].time_stamp << ","
+                              << "CAR"
+                              << ","
+                              << local_xyz.x << ","
+                              << local_xyz.y << ","
+                              << local_xyz.z << ","
+                              << heading << ","
+                              << pitch << ","
+                              << roll << ","
+                              << car_state.speed << ","
+                              << car_controls.steering << ","
+                              << image_name << std::endl;
+                }
+                else {
+                    data_file << response[0].time_stamp << ","
+                              << local_xyz.x << ","
+                              << local_xyz.y << ","
+                              << local_xyz.z << ","
+                              << heading << ","
+                              << pitch << ","
+                              << roll << ","
+                              << 0 << ","
+                              << 0 << ","
+                              << image_name << std::endl;
+                }
+                cv::imshow("pano", h_result);
+                cv::waitKey(1);
+
+                // Update the next frame time
+                client.simContinueForTime(frame_duration.count());
             }
 
-            GpsCoordinate current_gps{ gps_data.gnss.geo_point.latitude, gps_data.gnss.geo_point.longitude, gps_data.gnss.geo_point.altitude };
-            CartesianCoordinate local_xyz = gpsToEnu(current_gps, ref_gps);
-
-            std::string image_name = data_folder + "/panorama_" + std::to_string(response[0].time_stamp) + ".jpg";
-            cv::imwrite(image_name, h_result);
-
-             cv::imshow("pano", h_result);
-             
-
-            if (isCarMode) {
-                 auto car_controls = client.getCarControls();
-                 auto car_state = client.getCarState();
-                 data_file << response[0].time_stamp << ","
-                           << local_xyz.x << ","
-                           << local_xyz.y << ","
-                           << local_xyz.z << ","
-                           << heading << ","
-                           << car_state.speed << ","
-                           << car_controls.steering << ","
-                           << image_name << std::endl;
-            }
-            cv::waitKey(1);
             
         }
     }

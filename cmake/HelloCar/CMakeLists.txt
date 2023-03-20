@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.25.0)
-project(HelloCar)
+set(CMAKE_CUDA_ARCHITECTURES 86)
+project(HelloCar LANGUAGES CXX CUDA)
+
 
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../cmake-modules") 
 INCLUDE("${CMAKE_CURRENT_LIST_DIR}/../cmake-modules/CommonSetup.cmake")
@@ -8,7 +10,7 @@ CommonSetup()
 IncludeEigen()
 
 SetupConsoleBuild()
-find_package(protobuf REQUIRED)
+find_package(protobuf CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 
@@ -26,7 +28,6 @@ include_directories(
 AddExecutableSource()
 
 target_link_libraries(${PROJECT_NAME}  CUDA::cudart
-        CUDA::nvToolsExt
         CUDA::cublas
         CUDA::cublasLt
         CUDA::cufft
