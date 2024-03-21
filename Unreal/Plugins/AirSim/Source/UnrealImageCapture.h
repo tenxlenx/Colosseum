@@ -9,6 +9,7 @@ class UnrealImageCapture : public msr::airlib::ImageCaptureBase
 {
 public:
     typedef msr::airlib::ImageCaptureBase::ImageType ImageType;
+    typedef msr::airlib::ImageCaptureBase ImageCaptureBase;
 
     UnrealImageCapture(const common_utils::UniqueValueMap<std::string, APIPCamera*>* cameras);
     virtual ~UnrealImageCapture();

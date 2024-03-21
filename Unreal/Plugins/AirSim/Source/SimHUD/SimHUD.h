@@ -24,6 +24,9 @@ public:
     typedef msr::airlib::ImageCaptureBase::ImageType ImageType;
     typedef msr::airlib::AirSimSettings AirSimSettings;
 
+     // Cube.
+    typedef msr::airlib::ImageCaptureBase ImageCaptureBase;
+
 public:
     void inputEventToggleRecording();
     void inputEventToggleReport();
