@@ -289,11 +289,12 @@ void APIPCamera::EndPlay(const EEndPlayReason::Type EndPlayReason)
     distortion_material_static_ = nullptr;
     distortion_materials_.Empty();
 
-    for (unsigned int image_type = 0; image_type < imageTypeCount(); ++image_type) {
+    for (unsigned int image_type = 0; image_type < imageTypeCount2D(); ++image_type) {
         //use final color for all calculations
         captures_[image_type] = nullptr;
         render_targets_[image_type] = nullptr;
         detections_[image_type] = nullptr;
+        
     }
 
     // Cube.
