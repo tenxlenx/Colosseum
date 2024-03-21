@@ -1,6 +1,7 @@
 #include "PIPCamera.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Components/SceneCaptureComponentCube.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/TextureRenderTargetCube.h"
@@ -65,7 +66,7 @@ void APIPCamera::PostInitializeComponents()
     captures_.Init(nullptr, imageTypeCount2D());
     render_targets_.Init(nullptr, imageTypeCount2D());
     detections_.Init(nullptr, imageTypeCount());
-    cube_detections_.Init(nullptr, imageTypeCount2D);
+    cube_detections_.Init(nullptr, imageTypeCount());
 
 
 
@@ -110,11 +111,11 @@ void APIPCamera::PostInitializeComponents()
     //set initial focal length
 
     for (unsigned int i = 0; i < imageTypeCount2D(); ++i) {
-        detections_cube_[i] = NewObject<UdetectionComponent2D>(this);
-        if (detections_cube_[i]) {
-            detections_cube_[i]->SetupAttachment(captures_cube_[i]);
-            detections_cube_[i]->RegisterComponent();
-            detections_cube_[i]->Deactivate();
+        cube_detections_[i] = NewObject<UDetectionComponent>(this);
+        if (cube_detections_[i]) {
+            cube_detections_[i]->SetupAttachment(captures_[i]);
+            cube_detections_[i]->RegisterComponent();
+            cube_detections_[i]->Deactivate();
         }
     }
     camera_->CurrentFocalLength = 11.9;
@@ -299,10 +300,10 @@ void APIPCamera::EndPlay(const EEndPlayReason::Type EndPlayReason)
     for (unsigned int cube_type = 0; cube_type < cubeTypeCount(); ++cube_type) {
         captures_cube_[cube_type] = nullptr;
         render_targets_cube_[cube_type] = nullptr;
-        detections_cube_[cube_type] = nullptr;
+        detections_[cube_type] = nullptr;
     }
 }
-}
+
 
 unsigned int APIPCamera::imageTypeCount()
 {
@@ -496,6 +497,7 @@ void APIPCamera::setupCameraFromSettings(const APIPCamera::CameraSetting& camera
                 updateCaptureComponentSettingCube(captures_cube_[cube_type], render_targets_cube_[cube_type], false, image_type_to_pixel_format_map_[image_type], capture_setting, false);
                 // No noise setting for cubes.
                 copyCameraSettingsToSceneCapture(camera_, captures_[image_type]); //CinemAirSim
+            }
         }
         else { //camera component
             updateCameraSetting(camera_, capture_setting, ned_transform);
@@ -796,7 +798,15 @@ void APIPCamera::onViewModeChanged(bool nodisplay)
         //USceneCaptureComponent2D* capture = getCaptureComponent(static_cast<ImageType>(image_type), false);
         auto capture = getCaptureComponentGeneral(static_cast<ImageType>(image_type), false);
         if (capture) {
-            setCaptureUpdate(capture, nodisplay);
+            //setCaptureUpdate(capture, nodisplay);
+            if (nodisplay) {
+                capture->bCaptureEveryFrame = false;
+                capture->bCaptureOnMovement = false;
+            }
+            else {
+                capture->bCaptureEveryFrame = true;
+                capture->bCaptureOnMovement = true;
+            }
         }
     }
 }

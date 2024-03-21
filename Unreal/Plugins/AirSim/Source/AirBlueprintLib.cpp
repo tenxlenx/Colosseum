@@ -4,6 +4,7 @@
 #include "AirBlueprintLib.h"
 #include "GameFramework/WorldSettings.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Components/SceneCaptureComponentCube.h"
 #include "Components/SkinnedMeshComponent.h"
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -312,6 +313,7 @@ T* UAirBlueprintLib::GetActorComponent(AActor* actor, FString name)
     }
     return found;
 }
+
 template UChildActorComponent* UAirBlueprintLib::GetActorComponent(AActor*, FString);
 template USceneCaptureComponent2D* UAirBlueprintLib::GetActorComponent(AActor*, FString);
 template UStaticMeshComponent* UAirBlueprintLib::GetActorComponent(AActor*, FString);
@@ -319,6 +321,7 @@ template URotatingMovementComponent* UAirBlueprintLib::GetActorComponent(AActor*
 template UCameraComponent* UAirBlueprintLib::GetActorComponent(AActor*, FString);
 template UDetectionComponent* UAirBlueprintLib::GetActorComponent(AActor*, FString);
 template UCineCameraComponent* UAirBlueprintLib::GetActorComponent(AActor*, FString);
+template USceneCaptureComponentCube* UAirBlueprintLib::GetActorComponent(AActor*, FString);
 
 bool UAirBlueprintLib::IsInGameThread()
 {

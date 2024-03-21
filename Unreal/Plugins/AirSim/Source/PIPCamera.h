@@ -12,6 +12,7 @@
 #include "NedTransform.h"
 #include "DetectionComponent.h"
 
+
 //CinemAirSim
 #include <CineCameraActor.h>
 #include <CineCameraComponent.h>
@@ -19,8 +20,8 @@
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include <Engine/TextureRenderTargetCube.h>
 #include "PIPCamera.generated.h"
-
 UCLASS()
 class AIRSIM_API APIPCamera : public ACineCameraActor //CinemAirSim
 {
@@ -104,11 +105,11 @@ private: //members
     UPROPERTY()
     TArray<UDetectionComponent*> detections_;
     UPROPERTY()
-    TArray<UDetectionComponent2D*> cube_detections_;
+    TArray<UDetectionComponent*> cube_detections_;
     UPROPERTY()
-    TArray<USceneCaptureComponent2D*> captures_cube_;
+    TArray<USceneCaptureComponentCube*> captures_cube_;
     UPROPERTY()
-    TArray<UTextureRenderTarget2D*> render_targets_cube;
+    TArray<UTextureRenderTargetCube*> render_targets_cube_;
 
     //CinemAirSim
     UPROPERTY()

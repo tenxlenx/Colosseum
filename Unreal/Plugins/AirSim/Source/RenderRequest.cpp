@@ -2,6 +2,7 @@
 #include "CubemapUnwrapUtils.h"
 #include "TextureResource.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "Engine/TextureRenderTargetCube.h"
 #include "Async/TaskGraphInterfaces.h"
 #include "ImageUtils.h"
 
