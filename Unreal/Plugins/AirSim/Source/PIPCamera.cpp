@@ -496,7 +496,7 @@ void APIPCamera::setupCameraFromSettings(const APIPCamera::CameraSetting& camera
                 const int cube_type = ImageCaptureBase::getCubeTypeIndex(image_type);
                 updateCaptureComponentSettingCube(captures_cube_[cube_type], render_targets_cube_[cube_type], false, image_type_to_pixel_format_map_[image_type], capture_setting, false);
                 // No noise setting for cubes.
-                copyCameraSettingsToSceneCapture(camera_, captures_[image_type]); //CinemAirSim
+                copyCameraSettingsToSceneCaptureCube(camera_, captures_cube_[cube_type]); //CinemAirSim
             }
         }
         else { //camera component
@@ -961,7 +961,12 @@ void APIPCamera::copyCameraSettingsToAllSceneCapture(UCameraComponent* camera)
 {
     int image_count = static_cast<int>(Utils::toNumeric(ImageType::Count));
     for (int image_type = image_count - 1; image_type >= 0; image_type--) {
-        copyCameraSettingsToSceneCapture(camera_, captures_[image_type]);
+        if (!ImageCaptureBase::isCubeType(image_type)) {
+            copyCameraSettingsToSceneCapture(camera_, captures_[image_type]);
+        }
+        else {
+            copyCameraSettingsToSceneCaptureCube(camera_, captures_cube_[ImageCaptureBase::getCubeTypeIndex(image_type)]);
+        }
     }
 }
 
@@ -983,6 +988,20 @@ void APIPCamera::copyCameraSettingsToSceneCapture(UCameraComponent* src, USceneC
 
         // But restore the original blendables
         dst_pp_settings.WeightedBlendables = dst_weighted_blendables;
+    }
+}
+
+
+void APIPCamera::copyCameraSettingsToSceneCaptureCube(UCameraComponent* src, USceneCaptureComponentCube* dst)
+{
+    if (src && dst) {
+        dst->SetWorldLocationAndRotation(src->GetComponentLocation(), src->GetComponentRotation());
+
+        FMinimalViewInfo camera_view_info;
+        src->GetCameraView(/*DeltaTime =*/0.0f, camera_view_info);
+
+        const FPostProcessSettings& src_pp_settings = camera_view_info.PostProcessSettings;
+ 
     }
 }
 

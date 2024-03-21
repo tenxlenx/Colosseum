@@ -162,5 +162,6 @@ private: //methods
     static void updateCameraSetting(UCineCameraComponent* camera, const CaptureSetting& setting, const NedTransform& ned_transform);
     void copyCameraSettingsToAllSceneCapture(UCameraComponent* camera);
     void copyCameraSettingsToSceneCapture(UCameraComponent* src, USceneCaptureComponent2D* dst);
+    void copyCameraSettingsToSceneCaptureCube(UCameraComponent* src, USceneCaptureComponentCube* dst);
     //end CinemAirSim
 };
